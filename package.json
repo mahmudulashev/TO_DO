@@ -1,0 +1,72 @@
+{
+  "name": "focus-flow",
+  "version": "1.0.0",
+  "description": "Weekly ritual planner and habit coach for macOS built with Electron + React.",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "cross-env VITE_DEV_SERVER=true concurrently \"npm:dev:renderer\" \"npm:dev:electron\"",
+    "dev:renderer": "vite",
+    "dev:electron": "wait-on tcp:5173 && node scripts/start-electron.js",
+    "build": "npm run build:renderer",
+    "build:renderer": "vite build",
+    "preview": "npm run build && node scripts/start-electron.js",
+    "dist": "npm run build && electron-builder --mac dmg zip",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": [
+    "productivity",
+    "electron",
+    "planner"
+  ],
+  "author": "",
+  "license": "MIT",
+  "build": {
+    "appId": "com.focusflow.app",
+    "productName": "Focus Flow",
+    "directories": {
+      "buildResources": "assets"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "assets/appIcon.icns",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    }
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
+    "electron-store": "^11.0.2",
+    "immer": "^10.1.3",
+    "lucide-react": "^0.546.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "uuid": "^13.0.0",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@types/node": "^24.9.1",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@vitejs/plugin-react": "^5.0.4",
+    "autoprefixer": "^10.4.21",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^38.4.0",
+    "electron-builder": "^26.0.12",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.7",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.12",
+    "wait-on": "^9.0.1"
+  }
+}
