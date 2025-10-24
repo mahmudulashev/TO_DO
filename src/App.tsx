@@ -14,8 +14,8 @@ import PlannerView from "@/features/planner/PlannerView";
 import HabitsView from "@/features/habits/HabitsView";
 import CoinsView from "@/features/coins/CoinsView";
 import WidgetView from "@/features/dashboard/WidgetView";
+import LogoMark from "@/components/LogoMark";
 import { getTodayKey } from "@/utils/date";
-import logoImage from "../assets/appIcon128.png";
 
 const tabs = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -67,7 +67,9 @@ const AppShell = () => {
 
       <aside className="relative z-10 flex w-72 flex-col border-r border-white/10 bg-surface/80 backdrop-blur-xl">
         <div className="flex items-center gap-3 px-6 py-8">
-          <img src={logoImage} alt="Focus Flow" className="h-12 w-12 rounded-2xl shadow-glow" />
+          <div className="rounded-2xl bg-white/10 p-1 shadow-glow ring-1 ring-white/5">
+            <LogoMark size={48} />
+          </div>
           <div>
             <h1 className="text-lg font-semibold tracking-wide">Focus Flow</h1>
             <p className="text-xs text-white/60">Ultra fokus haftalik ritual</p>
@@ -195,6 +197,38 @@ const SettingsView = () => {
   const widgetPinned = useFocusStore(state => state.widgetPinned);
   const toggleWidgetPinned = useFocusStore(state => state.toggleWidgetPinned);
   const resetWeekMeta = useFocusStore(state => state.resetWeekMeta);
+  const resetAllData = useFocusStore(state => state.resetAllData);
+  const [notificationFeedback, setNotificationFeedback] = useState<string | null>(null);
+  const [resetFeedback, setResetFeedback] = useState<string | null>(null);
+  const [notificationLoading, setNotificationLoading] = useState(false);
+  const [resetting, setResetting] = useState(false);
+
+  const handleNotificationToggle = async (checked: boolean) => {
+    setNotificationFeedback(null);
+    setNotificationLoading(true);
+    const result = await toggleNotification(checked);
+    if (!result.success && result.reason) {
+      setNotificationFeedback(result.reason);
+    } else if (result.success && checked) {
+      setNotificationFeedback("Bildirishnomalar faollashtirildi.");
+    } else {
+      setNotificationFeedback(null);
+    }
+    setNotificationLoading(false);
+  };
+
+  const handleFullReset = async () => {
+    if (typeof window !== "undefined") {
+      const confirmed = window.confirm(
+        "Barcha ma'lumotlar, vazifalar, odatlar va coinlar tozalanadi. Davom etasizmi?"
+      );
+      if (!confirmed) return;
+    }
+    setResetting(true);
+    await resetAllData();
+    setResetFeedback("Ma'lumotlar standart holatga qaytarildi.");
+    setResetting(false);
+  };
 
   return (
     <div className="space-y-6">
@@ -218,12 +252,18 @@ const SettingsView = () => {
               type="checkbox"
               checked={notificationsEnabled}
               onChange={event => {
-                void toggleNotification(event.target.checked);
+                void handleNotificationToggle(event.target.checked);
               }}
+              disabled={notificationLoading}
               className="h-5 w-10 appearance-none rounded-full bg-white/10 transition checked:bg-primary-500"
             />
           </label>
         </div>
+        {notificationFeedback && (
+          <div className="mt-3 rounded-2xl border border-white/10 bg-black/30 px-4 py-2 text-xs text-white/60">
+            {notificationFeedback}
+          </div>
+        )}
       </section>
 
       <section className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl">
@@ -260,6 +300,27 @@ const SettingsView = () => {
         >
           Limitni yangilash
         </button>
+      </section>
+
+      <section className="rounded-3xl border border-danger/30 bg-danger/10 p-6 backdrop-blur-xl">
+        <h2 className="text-lg font-semibold text-danger">To'liq reset</h2>
+        <p className="mt-1 text-sm text-danger/80">
+          Barcha foydalanuvchi ma'lumotlari o'chiriladi, dastur dastlabki holatiga qaytadi.
+        </p>
+        <button
+          onClick={() => {
+            void handleFullReset();
+          }}
+          disabled={resetting}
+          className="mt-4 rounded-2xl border border-danger/40 bg-danger/20 px-5 py-3 text-sm font-semibold text-danger transition hover:bg-danger/30 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          Tozalash va yangidan boshlash
+        </button>
+        {resetFeedback && (
+          <div className="mt-3 rounded-2xl border border-danger/30 bg-danger/10 px-4 py-2 text-xs text-danger/80">
+            {resetFeedback}
+          </div>
+        )}
       </section>
     </div>
   );

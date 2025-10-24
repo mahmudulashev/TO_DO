@@ -115,6 +115,7 @@ export interface FocusState extends FocusData {
   hydrate: () => Promise<void>;
   persist: () => Promise<void>;
   resetWeekMeta: () => Promise<void>;
+  resetAllData: () => Promise<void>;
   upsertTask: (
     task: Omit<FocusTask, "createdAt" | "updatedAt" | "id"> & { id?: string }
   ) => Promise<{ success: boolean; reason?: string }>;
@@ -127,7 +128,7 @@ export interface FocusState extends FocusData {
   addReward: (reward: { title: string; cost: number; description?: string }) => Promise<void>;
   deleteReward: (rewardId: string) => Promise<void>;
   deleteHabit: (habitId: string) => Promise<void>;
-  toggleNotification: (value: boolean) => Promise<void>;
+  toggleNotification: (value: boolean) => Promise<{ success: boolean; reason?: string }>;
   toggleWidgetPinned: (value: boolean) => void;
   addQuickNote: (note: string) => Promise<void>;
   removeQuickNote: (note: string) => Promise<void>;

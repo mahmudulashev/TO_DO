@@ -157,10 +157,7 @@ export const createDefaultState = (): FocusData => {
     weekMeta: getCurrentWeekMeta(),
     quickNotes: ["Ma'lumot: 3 marta jadvalni o'zgartirish limit"],
     focusStatements: ["Bugun qiladigan eng katta vazifa — Deep Work Sprint"],
-    priorities: [
-      { id: uuid(), title: "SaaS MVP 0.3 relizi", dueDate: undefined },
-      { id: uuid(), title: "Shakar detoks challenge", dueDate: undefined }
-    ],
+    priorities: [],
     notificationsEnabled: true,
     widgetPinned: true,
     lastHydratedAt: now

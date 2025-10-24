@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Gift, Store, Trophy, Wallet, Trash2 } from "lucide-react";
-import { format } from "date-fns";
+import { format, isSameDay } from "date-fns";
 import { useFocusStore } from "@/state/useFocusStore";
 import type { CoinLedgerEntry } from "@/state/types";
 import { getTodayKey } from "@/utils/date";
@@ -19,11 +19,12 @@ const CoinsView = () => {
   const todayKey = getTodayKey();
 
   const stats = useMemo(() => {
+    const today = new Date();
     const earned = ledger.filter(entry => entry.amount > 0).reduce((sum, entry) => sum + entry.amount, 0);
     const spent = ledger.filter(entry => entry.amount < 0).reduce((sum, entry) => sum + entry.amount, 0);
-    const today = ledger.filter(entry => entry.date.startsWith(todayKey));
-    const todayEarn = today.filter(entry => entry.amount > 0).reduce((sum, entry) => sum + entry.amount, 0);
-    const todaySpend = today.filter(entry => entry.amount < 0).reduce((sum, entry) => sum + entry.amount, 0);
+    const todayEntries = ledger.filter(entry => entry.date && isSameDay(new Date(entry.date), today));
+    const todayEarn = todayEntries.filter(entry => entry.amount > 0).reduce((sum, entry) => sum + entry.amount, 0);
+    const todaySpend = todayEntries.filter(entry => entry.amount < 0).reduce((sum, entry) => sum + entry.amount, 0);
     return {
       earned,
       spent: Math.abs(spent),

@@ -138,37 +138,167 @@ function getTodayKey() {
   return now.toISOString().slice(0, 10);
 }
 
+function isSameLocalDay(dateA, dateB) {
+  return (
+    dateA.getFullYear() === dateB.getFullYear() &&
+    dateA.getMonth() === dateB.getMonth() &&
+    dateA.getDate() === dateB.getDate()
+  );
+}
+
 function summariseDay(state) {
   if (!state) return { report: "", stats: null };
   const todayKey = getTodayKey();
-  const today = new Date(todayKey);
+  const today = new Date();
   const isoDay = toIsoWeekday(today.getDay());
   const templateTasks = Array.isArray(state.weeklyPlan)
     ? state.weeklyPlan.filter(task => task.weekday === isoDay)
     : [];
   const dailyLog = state.dailyLogs?.[todayKey];
 
-  const completed = dailyLog?.tasks?.filter(t => t.status === "completed").length ?? 0;
-  const skipped = dailyLog?.tasks?.filter(t => t.status === "skipped").length ?? 0;
-  const total = templateTasks.length;
+  const logTasks = Array.isArray(dailyLog?.tasks) ? dailyLog.tasks : [];
+  const tasksForToday = templateTasks
+    .map(task => {
+      const start = new Date();
+      start.setHours(task.hour ?? 0, task.minute ?? 0, 0, 0);
+      const end = new Date(start.getTime() + (task.durationMinutes || 60) * 60000);
+      const entry = logTasks.find(item => item.taskId === task.id);
+      const status = entry?.status ?? "pending";
+      return {
+        id: task.id,
+        title: task.title,
+        reward: task.coinReward ?? 0,
+        difficulty: task.difficulty,
+        status,
+        start,
+        end
+      };
+    })
+    .sort((a, b) => a.start.getTime() - b.start.getTime());
+
+  const completedTasks = tasksForToday.filter(task => task.status === "completed");
+  const skippedTasks = tasksForToday.filter(task => task.status === "skipped");
+  const inProgress = tasksForToday.filter(task => task.status === "in_progress");
+  const total = tasksForToday.length;
+  const completed = completedTasks.length;
+  const skipped = skippedTasks.length;
   const pending = Math.max(total - completed - skipped, 0);
+  const overdueTasks = tasksForToday.filter(task => task.status !== "completed" && task.end < today);
+  const upcomingTasks = tasksForToday.filter(task => task.status !== "completed" && task.start > today);
+  const progressRatio = total ? completed / total : 0;
 
   const todayLedger = Array.isArray(state.coinLedger)
-    ? state.coinLedger.filter(entry => entry.date?.startsWith(todayKey))
+    ? state.coinLedger.filter(entry => {
+        if (!entry?.date) return false;
+        const entryDate = new Date(entry.date);
+        return isSameLocalDay(entryDate, today);
+      })
     : [];
   const earned = todayLedger.filter(entry => entry.amount > 0).reduce((sum, entry) => sum + entry.amount, 0);
   const spent = todayLedger.filter(entry => entry.amount < 0).reduce((sum, entry) => sum + Math.abs(entry.amount), 0);
 
-  const mood =
-    completed === 0 && pending > 0
-      ? "Bugun reja biroz chetga chiqdi. Nimalar halaqit berganini yozib chiqing, ertaga unga qarshi strategiya tuzamiz."
-      : skipped > completed
-      ? "Ko'p ishlar hozircha tugallanmagan. Eng katta to'siq nimada? Uni ertangi jadvalingizda hal qilamiz."
-      : "Zo'r ish! Endi mukofotlaringizni rejalashtiring va ijodiy dam oling.";
+  const coinDelta = earned - spent;
 
-  const report = `• Tugallangan: ${completed}\n• Qoldi: ${pending}\n• O'tkazib yuborildi: ${skipped}\n• Coinlar: +${earned} / -${spent}\n\nAI Coach: ${mood}`;
+  const habitLogs = Array.isArray(state.habitLogs)
+    ? state.habitLogs.filter(log => log.date === todayKey)
+    : [];
+  const habitIdsToday = new Set(habitLogs.map(log => log.habitId));
+  const habits = Array.isArray(state.habits) ? state.habits : [];
+  const habitHighlights = habits
+    .filter(habit => habitIdsToday.has(habit.id))
+    .map(habit => habit.title)
+    .slice(0, 3);
+  const topStreakHabit = habits.reduce((best, habit) => {
+    if (!best || (habit.bestStreak ?? 0) > (best.bestStreak ?? 0)) {
+      return habit;
+    }
+    return best;
+  }, null);
 
-  return { report, stats: { completed, pending, skipped, earned, spent } };
+  const completedHighlights = completedTasks
+    .sort((a, b) => b.reward - a.reward)
+    .slice(0, 3)
+    .map(task => `${task.title} (+${task.reward} coin)`);
+
+  const nextAction =
+    inProgress[0] ??
+    overdueTasks.sort((a, b) => a.end.getTime() - b.end.getTime())[0] ??
+    upcomingTasks.sort((a, b) => a.start.getTime() - b.start.getTime())[0] ??
+    null;
+
+  let coachAdvice;
+  if (!total) {
+    coachAdvice =
+      habitLogs.length > 0
+        ? "Odatlar bo'yicha zo'r start! Endi Planner sahifasida ertangi kun uchun kamida bitta blok qo'shing."
+        : "Planner hozircha bo'sh. Eng muhim 3 vazifani yozib, vaqtini bloklab oling.";
+  } else if (progressRatio >= 0.95) {
+    coachAdvice = "Legend darajasi! Bugungi sprint yakunlandi, endi o'zingizni mukofotlashni unutmang.";
+  } else if (progressRatio >= 0.6) {
+    coachAdvice =
+      overdueTasks.length > 0
+        ? "Progress yaxshi, lekin kechikayotgan blokni yopib, kunni yakunlab qo'ying."
+        : "Ritm yaxshi ketdi. Shu ruhda oxirgi blok(lar)ni ham yakunlab qo'ying.";
+  } else if (skipped >= Math.max(1, Math.ceil(total / 2))) {
+    coachAdvice =
+      "Bugun ko'p vazifa o'tkazildi. Sabablarini yozib chiqing va ertaga muhimlari uchun to'siqlarni yo'q qiling.";
+  } else if (inProgress.length > 0) {
+    coachAdvice = `Fokusni tugating: "${inProgress[0].title}" blokini 25 daqiqa ichida yakunlashga harakat qiling.`;
+  } else if (overdueTasks.length > 0) {
+    coachAdvice = `Avval kechikayotgan "${overdueTasks[0].title}" blokini yopib, keyin boshqa ishlarni boshlang.`;
+  } else {
+    coachAdvice = "Bugun hali ham vaqt bor. Eng katta qiymat olib keladigan blokni tanlab, fokusni yoqing.";
+  }
+
+  const lines = [];
+  lines.push("📈 Bugungi natija");
+  lines.push(`• Vazifalar: ${completed}/${total} (${Math.round(progressRatio * 100)}%)`);
+  lines.push(`• Coinlar: +${earned} / -${spent} (${coinDelta >= 0 ? "+" : ""}${coinDelta} balans o'zgarishi)`);
+  lines.push(`• Odatlar: ${habitLogs.length} ta check-in`);
+  if (topStreakHabit?.bestStreak) {
+    lines.push(`• Eng uzun streak: ${topStreakHabit.title} (${topStreakHabit.bestStreak} kun)`);
+  }
+
+  lines.push("");
+  lines.push("✅ G'alabalar");
+  if (completedHighlights.length > 0) {
+    completedHighlights.forEach(item => {
+      lines.push(`• ${item}`);
+    });
+  } else {
+    lines.push("• Bugun hali vazifa yakunlanmadi. Bir soatni deep work uchun ajrating.");
+  }
+  if (habitHighlights.length > 0) {
+    lines.push(`• Habitlar: ${habitHighlights.join(", ")}`);
+  }
+
+  lines.push("");
+  lines.push("🎯 Keyingi qadam");
+  lines.push(`• ${coachAdvice}`);
+  if (nextAction) {
+    const nextTime = nextAction.start.toLocaleTimeString("uz-UZ", { hour: "2-digit", minute: "2-digit" });
+    lines.push(`• Keyingi blok: ${nextTime} — ${nextAction.title}`);
+  } else if (!total) {
+    lines.push("• Plannerga kamida bitta strategik blok qo'shing.");
+  }
+  if (coinDelta < 0) {
+    lines.push("• Coin sarfi daromaddan ko'p bo'ldi, ertaga bonus olish uchun yuqori qiymatli blokni bajaring.");
+  }
+
+  const report = lines.join("\n");
+
+  return {
+    report,
+    stats: {
+      completed,
+      pending,
+      skipped,
+      earned,
+      spent,
+      habitsChecked: habitLogs.length,
+      progress: progressRatio
+    }
+  };
 }
 
 function scheduleWatcher() {

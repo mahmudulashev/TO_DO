@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { produce } from "immer";
 import { v4 as uuid } from "uuid";
-import { formatISO, parseISO } from "date-fns";
+import { differenceInCalendarDays, parseISO } from "date-fns";
 import { createDefaultState } from "@/state/defaultData";
 import type {
   CoinLedgerEntry,
@@ -200,6 +200,14 @@ export const useFocusStore = create<FocusState>()(
       });
       await get().persist();
     },
+    resetAllData: async () => {
+      const fresh = createDefaultState();
+      set(() => ({
+        ...fresh,
+        hydrated: true
+      }));
+      await get().persist();
+    },
     upsertTask: async input => {
       const now = new Date().toISOString();
       let success = true;
@@ -373,7 +381,20 @@ export const useFocusStore = create<FocusState>()(
         const alreadyLogged = state.habitLogs.some(log => log.habitId === habitId && log.date === targetDate);
         if (alreadyLogged) return;
 
-        habit.streak += 1;
+        const currentDate = parseISO(targetDate);
+        const lastLoggedDate = habit.lastCheckDate ? parseISO(habit.lastCheckDate) : null;
+
+        if (!habit.streak || habit.streak < 1 || !lastLoggedDate) {
+          habit.streak = 1;
+        } else {
+          const gap = differenceInCalendarDays(currentDate, lastLoggedDate);
+          if (gap === 1) {
+            habit.streak += 1;
+          } else if (gap > 1) {
+            habit.streak = 1;
+          } // gap <= 0 => logging past day, keep streak as-is but ensure minimum 1
+        }
+
         habit.bestStreak = Math.max(habit.bestStreak, habit.streak);
         habit.lastCheckDate = targetDate;
         habit.updatedAt = now;
@@ -431,16 +452,53 @@ export const useFocusStore = create<FocusState>()(
       await get().persist();
     },
     toggleNotification: async value => {
+      const hasWindow = typeof window !== "undefined";
+      const electronNotify = hasWindow ? window.focusFlowAPI?.notify : undefined;
+      const notificationSupported = hasWindow && "Notification" in window;
+
+      if (!value) {
+        set(state => {
+          state.notificationsEnabled = false;
+        });
+        await get().persist();
+        return { success: true };
+      }
+
+      let success = true;
+      let reason: string | undefined;
+
+      if (!electronNotify) {
+        if (!notificationSupported) {
+          success = false;
+          reason = "Brauzer bildirishnoma yuborolmaydi.";
+        } else {
+          let permission = Notification.permission;
+          if (permission === "default" && typeof Notification.requestPermission === "function") {
+            try {
+              permission = await Notification.requestPermission();
+            } catch {
+              permission = "denied";
+            }
+          }
+          success = permission === "granted";
+          if (!success) {
+            reason = "Bildirishnomalar uchun ruxsat berilmadi.";
+          }
+        }
+      }
+
       set(state => {
-        state.notificationsEnabled = value;
+        state.notificationsEnabled = success;
       });
-      if (value) {
+
+      if (success) {
         await sendNotification({
           title: "Bildirishnomalar yoqildi",
           body: "Rejalaringiz bo'yicha eslatmalar yuboriladi"
         });
       }
       await get().persist();
+      return { success, reason };
     },
     toggleWidgetPinned: value => {
       set(state => {

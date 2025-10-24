@@ -71,6 +71,17 @@ const WidgetView = () => {
         </div>
         <div className="mt-4 flex gap-3">
           <button
+            disabled={!nextTask || nextTask.status === "in_progress"}
+            onClick={() => {
+              if (nextTask) {
+                void handleAction(nextTask.id, "in_progress");
+              }
+            }}
+            className="flex-1 rounded-2xl border border-primary-500/40 bg-primary-500/15 px-4 py-2 text-xs font-semibold text-primary-100 transition hover:bg-primary-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {nextTask?.status === "in_progress" ? "Fokus davom etmoqda" : "Boshlash"}
+          </button>
+          <button
             disabled={!nextTask}
             onClick={() => {
               if (nextTask) {
@@ -109,9 +120,19 @@ const WidgetView = () => {
                 <div className="font-medium text-white/80">{task.title}</div>
                 <div className="text-xs text-white/40">{format(task.start, "HH:mm")} · {task.reward} coin</div>
               </div>
-            </div>
+              </div>
             <span className="text-xs uppercase tracking-[0.2em] text-white/40">
-              {task.status === "completed" ? "DONE" : task.isCurrent ? "NOW" : "NEXT"}
+              {task.status === "completed"
+                ? "DONE"
+                : task.status === "skipped"
+                ? "SKIPPED"
+                : task.status === "in_progress"
+                ? "FOCUS"
+                : task.isCurrent
+                ? "NOW"
+                : task.isFuture
+                ? "NEXT"
+                : "PENDING"}
             </span>
           </div>
         ))}

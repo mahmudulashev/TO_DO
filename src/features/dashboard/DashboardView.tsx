@@ -12,7 +12,7 @@ import {
   TimerReset,
   XCircle
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, isSameDay } from "date-fns";
 import { useFocusStore } from "@/state/useFocusStore";
 import type { TaskStatus } from "@/state/types";
 import { getTodayKey } from "@/utils/date";
@@ -85,7 +85,6 @@ const DashboardView = ({ onOpenPlanner }: DashboardViewProps) => {
   const dailyLogs = useFocusStore(state => state.dailyLogs);
   const coinLedger = useFocusStore(state => state.coinLedger);
   const coinBank = useFocusStore(state => state.coinBank);
-  const priorities = useFocusStore(state => state.priorities);
   const quickNotes = useFocusStore(state => state.quickNotes);
   const addQuickNote = useFocusStore(state => state.addQuickNote);
   const removeQuickNote = useFocusStore(state => state.removeQuickNote);
@@ -158,7 +157,14 @@ const DashboardView = ({ onOpenPlanner }: DashboardViewProps) => {
   }, [dailyLogs, coinLedger, todayKey]);
 
   const todayLedger = useMemo(() => {
-    return coinLedger.filter(entry => entry.date.startsWith(todayKey)).slice(0, 6);
+    const today = new Date();
+    return coinLedger
+      .filter(entry => {
+        if (!entry.date) return false;
+        const entryDate = new Date(entry.date);
+        return isSameDay(entryDate, today);
+      })
+      .slice(0, 6);
   }, [coinLedger, todayKey]);
 
   const coachMessage = useMemo(
@@ -261,7 +267,7 @@ const DashboardView = ({ onOpenPlanner }: DashboardViewProps) => {
           <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl">
             <div className="flex items-start justify-between">
               <div>
-                <div className="text-xs uppercase tracking-[0.2em] text-white/50">AI tanbeh</div>
+                <div className="text-xs uppercase tracking-[0.2em] text-white/50">AI tahlil</div>
                 <p className="mt-3 whitespace-pre-line text-sm text-white/70">
                   {aiSummary || "Kun yakunida AI coach tahlil qiladi."}
                 </p>
@@ -336,6 +342,19 @@ const DashboardView = ({ onOpenPlanner }: DashboardViewProps) => {
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-3">
+                  <button
+                    onClick={() => {
+                      void handleAction(task.id, "in_progress");
+                    }}
+                    disabled={task.status === "in_progress"}
+                    className={clsx(
+                      "rounded-full border border-primary-500/40 bg-primary-500/15 px-4 py-2 text-xs font-semibold transition hover:bg-primary-500/20",
+                      task.status === "in_progress" ? "text-primary-100 opacity-80" : "text-primary-100",
+                      "disabled:cursor-not-allowed disabled:opacity-60"
+                    )}
+                  >
+                    {task.status === "in_progress" ? "Fokus davom etmoqda" : "Fokusni boshlash"}
+                  </button>
                   <button
                     onClick={() => {
                       void handleAction(task.id, "completed");
@@ -443,25 +462,6 @@ const DashboardView = ({ onOpenPlanner }: DashboardViewProps) => {
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-        {priorities.map(priority => (
-          <div
-            key={priority.id}
-            className="rounded-3xl border border-white/10 bg-white/5 p-5 text-sm text-white/70 backdrop-blur-xl"
-          >
-            <div className="flex items-center gap-2 text-white">
-              <Flame className="h-4 w-4 text-warning" />
-              <span className="font-semibold">{priority.title}</span>
-            </div>
-            <p className="mt-2 text-xs text-white/50">
-              {priority.dueDate ? `Muddat: ${priority.dueDate}` : "O'zingiz belgilagan maqsad."}
-            </p>
-            <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs text-white/50">
-              <Sparkles className="h-3 w-3" /> Strategik ustuvorlik
-            </div>
-          </div>
-        ))}
-      </section>
     </div>
   );
 };
